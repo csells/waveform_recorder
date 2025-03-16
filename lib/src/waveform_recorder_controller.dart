@@ -39,6 +39,17 @@ class WaveformRecorderController extends ChangeNotifier {
   var _length = Duration.zero;
   DateTime? _startTime;
 
+
+  ///This keeps track of the time elapsed since recording was started.
+  final Stopwatch _stopwatch = Stopwatch();
+
+  /// Returns the elapsed time since the recording started,
+  /// excluding any paused time.
+  Duration get timeElapsed => _stopwatch.elapsed;
+
+  ///Indicates whether audio recording is currently paused or not.
+  bool get isPaused => !_stopwatch.isRunning;
+
   /// Indicates whether audio recording is currently in progress.
   bool get isRecording => _audioRecorder != null;
 
@@ -69,6 +80,7 @@ class WaveformRecorderController extends ChangeNotifier {
     _file = null;
     _length = Duration.zero;
     _startTime = null;
+    _stopwatch..stop()..reset();
     super.dispose();
   }
 
@@ -93,6 +105,7 @@ class WaveformRecorderController extends ChangeNotifier {
     final ext = _extFor(encoder);
     final path = await PlatformHelper.getTempPath(ext);
     await _audioRecorder!.start(config, path: path);
+    _stopwatch.start();
 
     // map the amplitude types as they stream in
     _amplitudeStream = _audioRecorder!.onAmplitudeChanged(interval).map(
@@ -113,13 +126,46 @@ class WaveformRecorderController extends ChangeNotifier {
     final path = await _audioRecorder!.stop() ?? '';
     if (path.isNotEmpty) {
       _file = _fileFor(encoder, path);
-      _length = DateTime.now().difference(_startTime!);
+      _length = _stopwatch.elapsed;
     }
 
     unawaited(_audioRecorder!.dispose());
     _audioRecorder = null;
     _amplitudeStream = null;
     _startTime = null;
+    _stopwatch..stop()..reset();
+
+    notifyListeners();
+  }
+
+  /// Pauses the current audio recording session if it is recording.
+  ///
+  /// Throws an exception if the recording has not been started yet.
+  Future<void> pauseRecording() async {
+    if (_audioRecorder == null) throw Exception('Recording not started');
+    assert(_file == null);
+    assert(_length == Duration.zero);
+
+    if(await _audioRecorder!.isRecording()){
+      await _audioRecorder!.pause();
+      _stopwatch.stop();
+    }
+
+    notifyListeners();
+  }
+
+  /// Resumes the current audio recording session if it was paused.
+  ///
+  /// Throws an exception if the recording has not been started yet.
+  Future<void> resumeRecording() async {
+    if (_audioRecorder == null) throw Exception('Recording not started');
+    assert(_file == null);
+    assert(_length == Duration.zero);
+
+    if(await _audioRecorder!.isPaused()){
+      await _audioRecorder!.resume();
+      _stopwatch.start();
+    }
 
     notifyListeners();
   }
@@ -129,7 +175,7 @@ class WaveformRecorderController extends ChangeNotifier {
   /// This method stops the recording, deletes any temporary recording files,
   /// and resets the controller state. It does not save the recorded audio.
   ///
-  /// Throws an exception if not currently recordin
+  /// Throws an exception if not currently recording
   Future<void> cancelRecording() async {
     if (_audioRecorder == null) throw Exception('Not recording');
     assert(_file == null);
@@ -144,6 +190,7 @@ class WaveformRecorderController extends ChangeNotifier {
     _audioRecorder = null;
     _amplitudeStream = null;
     _startTime = null;
+    _stopwatch..stop()..reset();
 
     notifyListeners();
   }

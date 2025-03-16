@@ -109,7 +109,7 @@ class _WaveformRecorderState extends State<WaveformRecorder> {
       );
 
   String get _elapsedTime {
-    final elapsed = DateTime.now().difference(widget.controller.startTime!);
+    final elapsed = widget.controller.timeElapsed;
     return ''
         '${elapsed.inMinutes.toString().padLeft(2, '0')}:'
         '${(elapsed.inSeconds % 60).toString().padLeft(2, '0')}';

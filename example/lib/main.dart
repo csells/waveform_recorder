@@ -75,6 +75,15 @@ class _MyAppState extends State<MyApp> {
                         ),
                       ),
                       const Gap(8),
+                      if(_waveController.isRecording)
+                      IconButton(
+                        icon: Icon(
+                          _waveController.isPaused
+                              ? Icons.play_arrow
+                              : Icons.pause,
+                        ),
+                        onPressed: _togglePauseRecording
+                      ),
                       IconButton(
                         icon: Icon(
                           _waveController.isRecording ? Icons.stop : Icons.mic,
@@ -106,6 +115,12 @@ class _MyAppState extends State<MyApp> {
     await _waveController.cancelRecording();
     _textController.text = 'canceled';
   }
+
+  Future<void> _togglePauseRecording() => switch (_waveController.isPaused) {
+    true => _waveController.resumeRecording(),
+    false => _waveController.pauseRecording(),
+  };
+
 
   Future<void> _onRecordingStopped() async {
     final file = _waveController.file;
