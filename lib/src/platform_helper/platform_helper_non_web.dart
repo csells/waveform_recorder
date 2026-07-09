@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:io';
 
 import 'package:flutter/foundation.dart';
@@ -17,9 +18,43 @@ class PlatformHelper {
   /// [String].
   static Future<String> getTempPath(String ext) async {
     final dir = await getTemporaryDirectory();
+    if (!dir.existsSync()) dir.createSync(recursive: true);
     return p.join(
       dir.path,
       'audio-${DateTime.now().millisecondsSinceEpoch}.$ext',
+    );
+  }
+
+  /// Waits until a temporary audio file is readable and no longer growing.
+  ///
+  /// Some native recorders return the output path before the container has
+  /// finished writing its final metadata. This method waits for an observable
+  /// ready state: the file exists, is non-empty, and has the same length across
+  /// two polls.
+  static Future<void> waitForTempAudioFile(
+    String path, {
+    Duration timeout = const Duration(seconds: 5),
+    Duration pollInterval = const Duration(milliseconds: 25),
+  }) async {
+    if (path.isEmpty) return;
+
+    final file = File(path);
+    final stopwatch = Stopwatch()..start();
+    int? previousLength;
+
+    while (stopwatch.elapsed < timeout) {
+      if (file.existsSync()) {
+        final length = file.lengthSync();
+        if (length > 0 && length == previousLength) return;
+        previousLength = length;
+      }
+
+      await Future<void>.delayed(pollInterval);
+    }
+
+    throw TimeoutException(
+      'Timed out waiting for audio file to be ready: $path',
+      timeout,
     );
   }
 

@@ -6,7 +6,10 @@ import 'package:path/path.dart' as p;
 import 'package:path_provider/path_provider.dart';
 
 class PlatformHelper {
-  static Source audioSource(XFile file) => DeviceFileSource(file.path);
+  static Source audioSource(XFile file) => DeviceFileSource(
+        file.path,
+        mimeType: file.mimeType,
+      );
 
   static Future<void> deleteFile(XFile file) => File(file.path).delete();
 

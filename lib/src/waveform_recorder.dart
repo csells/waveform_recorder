@@ -94,7 +94,9 @@ class _WaveformRecorderState extends State<WaveformRecorder> {
               const SizedBox(width: 8),
               Expanded(
                 child: AnimatedWaveList(
-                  stream: widget.controller.amplitudeStream,
+                  stream: widget.controller.isRecording
+                      ? widget.controller.amplitudeStream
+                      : const Stream<Amplitude>.empty(),
                   barBuilder: (animation, amplitude) => WaveFormBar(
                     animation: animation,
                     amplitude: amplitude,

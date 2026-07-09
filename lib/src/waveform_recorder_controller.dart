@@ -144,21 +144,25 @@ class WaveformRecorderController extends ChangeNotifier {
     assert(_file == null);
     assert(_length == Duration.zero);
 
-    final path = await _audioRecorder!.stop() ?? '';
-    if (path.isNotEmpty) {
-      _file = _fileFor(config.encoder, path);
-      _length = _stopwatch.elapsed;
+    final recorder = _audioRecorder!;
+    try {
+      final path = await recorder.stop() ?? '';
+      if (path.isNotEmpty) {
+        await PlatformHelper.waitForTempAudioFile(path);
+        _file = _fileFor(config.encoder, path);
+        _length = _stopwatch.elapsed;
+      }
+    } finally {
+      unawaited(recorder.dispose());
+      _audioRecorder = null;
+      _amplitudeStream = null;
+      _startTime = null;
+      _stopwatch
+        ..stop()
+        ..reset();
+
+      notifyListeners();
     }
-
-    unawaited(_audioRecorder!.dispose());
-    _audioRecorder = null;
-    _amplitudeStream = null;
-    _startTime = null;
-    _stopwatch
-      ..stop()
-      ..reset();
-
-    notifyListeners();
   }
 
   /// Pauses the current audio recording session if it is recording.

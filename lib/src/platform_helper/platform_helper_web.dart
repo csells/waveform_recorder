@@ -10,6 +10,16 @@ class PlatformHelper {
   /// parameter is ignored in the web implementation.
   static Future<String> getTempPath(String ext) async => '';
 
+  /// Waits until a temporary audio file is ready.
+  ///
+  /// Web recordings are represented by browser-managed URLs rather than local
+  /// files, so there is no filesystem readiness to wait for.
+  static Future<void> waitForTempAudioFile(
+    String path, {
+    Duration timeout = const Duration(seconds: 5),
+    Duration pollInterval = const Duration(milliseconds: 25),
+  }) async {}
+
   /// Deletes a temporary audio file at the specified path.
   ///
   /// This method is a no-op on web platforms since temporary files are handled
