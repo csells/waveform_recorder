@@ -99,7 +99,10 @@ class _MyAppState extends State<MyApp> {
                         icon: Icon(
                           _waveController.isRecording ? Icons.stop : Icons.mic,
                         ),
-                        onPressed: _toggleRecording,
+                        // starting can block on an OS permission prompt
+                        onPressed: _waveController.isStarting
+                            ? null
+                            : _toggleRecording,
                       ),
                     ],
                   ),

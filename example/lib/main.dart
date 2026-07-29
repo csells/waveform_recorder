@@ -119,17 +119,21 @@ class _HomePageState extends State<HomePage> {
                         onPressed: _cancelRecording,
                       ),
                     IconButton(
-                      tooltip: _waveController.isRecording
-                          ? 'Stop Recording'
-                          : 'Start Recording',
+                      tooltip: _waveController.isStarting
+                          ? 'Starting Recording...'
+                          : _waveController.isRecording
+                              ? 'Stop Recording'
+                              : 'Start Recording',
                       icon: Container(
                         width: 32,
                         height: 32,
                         decoration: BoxDecoration(
                           shape: BoxShape.circle,
-                          color: _waveController.isRecording
-                              ? Colors.blue
-                              : Colors.green,
+                          color: _waveController.isStarting
+                              ? Colors.grey
+                              : _waveController.isRecording
+                                  ? Colors.blue
+                                  : Colors.green,
                         ),
                         child: Center(
                           child: Icon(
@@ -141,7 +145,8 @@ class _HomePageState extends State<HomePage> {
                           ),
                         ),
                       ),
-                      onPressed: _toggleRecording,
+                      onPressed:
+                          _waveController.isStarting ? null : _toggleRecording,
                     ),
                     IconButton(
                       tooltip: _waveController.isRecording
@@ -244,6 +249,10 @@ class _HomePageState extends State<HomePage> {
       );
 
   Future<void> _toggleRecording() async {
+    // startRecording() can sit on an OS permission prompt for a while; ignore
+    // taps until it resolves one way or the other
+    if (_waveController.isStarting) return;
+
     if (_waveController.isRecording) {
       await _waveController.stopRecording();
     } else {

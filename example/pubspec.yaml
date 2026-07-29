@@ -6,21 +6,21 @@ environment:
   sdk: ^3.0.0
 
 dependencies:
-  audioplayers: any
-  cross_file: ^0.3.4+2
-  cupertino_icons: ^1.0.8
+  audioplayers: ^6.8.1
+  cross_file: ^0.3.5+4
+  cupertino_icons: ^1.0.9
   flutter:
     sdk: flutter
-  gap: any
+  gap: ^3.0.1
   path: ^1.9.1
-  path_provider: ^2.1.5
+  path_provider: ^2.1.6
   waveform_flutter: ^1.2.0
   waveform_recorder:
     path: ../
   web: ^1.1.1
 
 dev_dependencies:
-  all_lint_rules_community: ^0.0.41
+  all_lint_rules_community: ^0.0.43
   flutter_test:
     sdk: flutter
 
