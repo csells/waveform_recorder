@@ -1,3 +1,25 @@
+## 1.8.2
+
+- Fix [#12](https://github.com/csells/waveform_recorder/issues/12) again, this
+  time on the start side: `startRecording()` marked the controller as recording
+  before the amplitude stream existed, so anything that rebuilt during the
+  (potentially long) permission prompt read `amplitudeStream` and got
+  `Exception('Not recording')` thrown out of `build`. The recording session is
+  now published in a single step, so `isRecording` is never true without a live
+  `amplitudeStream`.
+- `amplitudeStream` now returns an empty stream instead of throwing when not
+  recording, making `WaveformRecorder` safe to mount in any controller state.
+- Add `WaveformRecorderController.isStarting` so apps can disable a record
+  button or show a spinner while the recorder spins up.
+- A failed `startRecording()` (e.g. a denied permission) now leaves the
+  controller idle and reusable instead of stuck reporting `Already recording`.
+- `onRecordingStopped` now fires only on an actual recording -> stopped
+  transition.
+- Reset the elapsed-time stopwatch on `startRecording()` so a recording that
+  follows `clear()` reports the correct length.
+- Bump the `cross_file` and `path_provider` constraints to the versions they
+  already resolve to.
+
 ## 1.8.1
 
 - Fix [#12](https://github.com/csells/waveform_recorder/issues/12):

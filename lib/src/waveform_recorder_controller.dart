@@ -55,6 +55,8 @@ class WaveformRecorderController extends ChangeNotifier {
   AudioRecorder? _audioRecorder;
   XFile? _file;
   var _length = Duration.zero;
+  var _starting = false;
+  var _disposed = false;
   DateTime? _startTime;
 
   ///This keeps track of the time elapsed since recording was started.
@@ -68,13 +70,28 @@ class WaveformRecorderController extends ChangeNotifier {
   bool get isPaused => !_stopwatch.isRunning;
 
   /// Indicates whether audio recording is currently in progress.
+  ///
+  /// This is only true once the recorder is live and [amplitudeStream] is
+  /// wired up. Starting is asynchronous, so there is a window after
+  /// [startRecording] is called during which this is still false; see
+  /// [isStarting].
   bool get isRecording => _audioRecorder != null;
+
+  /// Indicates whether a [startRecording] call is still in flight.
+  ///
+  /// Starting a recording is asynchronous and can block for a long time on an
+  /// OS permission prompt. During that window both this and [isRecording] tell
+  /// the truth: [isStarting] is true, [isRecording] is false. Use this to
+  /// disable a record button or show a spinner while the recorder spins up.
+  bool get isStarting => _starting;
 
   /// Provides a stream of amplitude data for generating the waveform.
   ///
-  /// Throws an exception if called when not recording.
+  /// Returns an empty stream when not recording, so this is always safe to
+  /// read — including from a `build` method, where a throw would take down the
+  /// app.
   Stream<waveform.Amplitude> get amplitudeStream =>
-      _amplitudeStream ?? (throw Exception('Not recording'));
+      _amplitudeStream ?? const Stream<waveform.Amplitude>.empty();
 
   /// The recorded audio file.
   ///
@@ -91,6 +108,7 @@ class WaveformRecorderController extends ChangeNotifier {
 
   @override
   void dispose() {
+    _disposed = true;
     _amplitudeStream = null;
     unawaited(_audioRecorder?.dispose());
     _audioRecorder = null;
@@ -105,33 +123,77 @@ class WaveformRecorderController extends ChangeNotifier {
 
   /// Starts a new audio recording session.
   ///
-  /// Throws an exception if already recording.
+  /// Throws an exception if already recording, or if a previous
+  /// [startRecording] call is still in flight.
+  ///
+  /// The session is published in a single step once the recorder is actually
+  /// live: until then [isRecording] stays false and [amplitudeStream] stays
+  /// empty, so it is safe to render from this controller while a start is
+  /// still in flight. If starting fails, the controller is left idle and ready
+  /// to try again.
   Future<void> startRecording() async {
-    if (_audioRecorder != null) throw Exception('Already recording');
+    if (_starting || _audioRecorder != null) {
+      throw Exception('Already recording');
+    }
     assert(_amplitudeStream == null);
     assert(_startTime == null);
+
+    _starting = true;
     _file = null;
     _length = Duration.zero;
 
-    // request permissions (needed for Android)
-    _audioRecorder = AudioRecorder();
-    await _audioRecorder!.hasPermission();
+    // Announce the pending start on a microtask so that callers may start
+    // recording from initState or a build callback without notifying
+    // listeners mid-build.
+    await Future<void>.microtask(() {
+      if (!_disposed) notifyListeners();
+    });
 
-    // start the recording into a temp file (or in memory on the web)
+    final recorder = AudioRecorder();
+    try {
+      // request permissions (needed for Android)
+      await recorder.hasPermission();
+
+      // start the recording into a temp file (or in memory on the web)
+      final ext = _extFor(config.encoder);
+      final path = await PlatformHelper.getTempPath(ext);
+      await recorder.start(config, path: path);
+    } on Object {
+      // leave the controller idle so the caller can retry
+      _starting = false;
+      unawaited(recorder.dispose());
+      if (!_disposed) notifyListeners();
+      rethrow;
+    }
+
+    // The controller can be disposed while the start is in flight — the user
+    // navigates away while the permission prompt is still up, say. The
+    // recorder is live by now, so let go of it rather than leaving the
+    // microphone hot.
+    if (_disposed) {
+      _starting = false;
+      unawaited(_discard(recorder));
+      return;
+    }
+
+    // Publish the session in one step. Assigning the recorder before its
+    // amplitude stream exists is what made isRecording lie and amplitudeStream
+    // throw out of build(); see issue #12.
     _startTime = DateTime.now();
-    _length = Duration.zero;
-    final ext = _extFor(config.encoder);
-    final path = await PlatformHelper.getTempPath(ext);
-    await _audioRecorder!.start(config, path: path);
-    _stopwatch.start();
+    _audioRecorder = recorder;
 
     // map the amplitude types as they stream in
-    _amplitudeStream = _audioRecorder!
+    _amplitudeStream = recorder
         .onAmplitudeChanged(interval)
         .map(
           (a) => waveform.Amplitude(current: a.current, max: a.max),
         )
         .asBroadcastStream(); // allows multiple listeners
+
+    _stopwatch
+      ..reset()
+      ..start();
+    _starting = false;
 
     notifyListeners();
   }
@@ -222,6 +284,19 @@ class WaveformRecorderController extends ChangeNotifier {
       ..reset();
 
     notifyListeners();
+  }
+
+  /// Stops and releases a recorder that nobody is going to listen to,
+  /// discarding whatever it captured.
+  Future<void> _discard(AudioRecorder recorder) async {
+    try {
+      final path = await recorder.stop() ?? '';
+      await PlatformHelper.deleteTempAudioFile(path);
+    } on Exception catch (e) {
+      debugPrint('Error discarding abandoned recording: $e');
+    } finally {
+      await recorder.dispose();
+    }
   }
 
   XFile _fileFor(AudioEncoder encoder, String path) {

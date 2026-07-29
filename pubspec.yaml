@@ -1,6 +1,6 @@
 name: waveform_recorder
 description: "A Flutter package for recording audio with real-time waveform visualization, ideal for voice messaging and audio recording features in chat applications."
-version: 1.8.1
+version: 1.8.2
 homepage: https://github.com/csells/waveform_recorder
 repository: https://github.com/csells/waveform_recorder
 
