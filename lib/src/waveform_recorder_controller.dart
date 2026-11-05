@@ -123,8 +123,9 @@ class WaveformRecorderController extends ChangeNotifier {
 
   /// Starts a new audio recording session.
   ///
-  /// Throws an exception if already recording, or if a previous
-  /// [startRecording] call is still in flight.
+  /// Throws an exception if already recording, if a previous
+  /// [startRecording] call is still in flight, or if microphone permission is
+  /// denied.
   ///
   /// The session is published in a single step once the recorder is actually
   /// live: until then [isRecording] stays false and [amplitudeStream] stays
@@ -151,8 +152,11 @@ class WaveformRecorderController extends ChangeNotifier {
 
     final recorder = AudioRecorder();
     try {
-      // request permissions (needed for Android)
-      await recorder.hasPermission();
+      // request permissions (needed for Android); without them there is
+      // nothing to record, so fail instead of starting a silent recorder
+      if (!await recorder.hasPermission()) {
+        throw Exception('Microphone permission denied');
+      }
 
       // start the recording into a temp file (or in memory on the web)
       final ext = _extFor(config.encoder);

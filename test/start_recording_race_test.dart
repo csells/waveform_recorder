@@ -29,12 +29,17 @@ class FakeRecordPlatform extends RecordPlatform {
   Future<bool> hasPermission(String recorderId, {bool request = true}) =>
       permissionGate?.future ?? Future.value(true);
 
+  /// How many times the recorder has been started.
+  int startCount = 0;
+
   @override
   Future<void> start(
     String recorderId,
     RecordConfig config, {
     required String path,
-  }) async {}
+  }) async {
+    startCount++;
+  }
 
   @override
   Future<Stream<Uint8List>> startStream(
@@ -207,6 +212,31 @@ void main() {
     expect(controller.isRecording, isTrue);
 
     await controller.stopRecording();
+    controller.dispose();
+    await settle();
+  });
+
+  test('a denied permission fails the start without starting the recorder',
+      () async {
+    final controller = WaveformRecorderController();
+    var notifications = 0;
+    controller.addListener(() => notifications++);
+
+    platform.permissionGate = Completer<bool>();
+    final starting = controller.startRecording();
+    await settle();
+    platform.permissionGate!.complete(false);
+
+    await expectLater(starting, throwsException);
+
+    expect(platform.startCount, 0);
+    expect(controller.isRecording, isFalse);
+    expect(controller.isStarting, isFalse);
+    expect(controller.startTime, isNull);
+    // Listeners hear about the failed start, so a UI showing isStarting
+    // goes back to idle.
+    expect(notifications, 2);
+
     controller.dispose();
     await settle();
   });
