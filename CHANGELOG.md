@@ -27,6 +27,10 @@
   follows `clear()` reports the correct length.
 - Bump the `cross_file` and `path_provider` constraints to the versions they
   already resolve to.
+- Update the example's platform projects so it builds on Flutter 3.47: the iOS
+  runner drops CocoaPods for Swift Package Manager (as macOS did in 1.8.1) and
+  picks up the UIScene lifecycle; Android moves to Gradle 9.3.1, AGP 9.1.0,
+  Kotlin 2.4.0 and NDK 28.2.
 
 ## 1.8.1
 
