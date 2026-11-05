@@ -46,33 +46,51 @@ class WaveformRecorder extends StatefulWidget {
 class _WaveformRecorderState extends State<WaveformRecorder> {
   Timer? _timer;
 
+  /// Tracks the controller's last observed state so that recording changes are
+  /// handled as transitions. The controller notifies for starting, pausing and
+  /// resuming too, and only a recording -> not-recording edge means "stopped".
+  late bool _wasRecording;
+
   @override
   void initState() {
     super.initState();
 
+    _wasRecording = widget.controller.isRecording;
+    widget.controller.addListener(_onRecordingChange);
     widget.onRecordingStarted?.call();
-    if (widget.onRecordingStopped != null) {
-      widget.controller.addListener(_onRecordingChange);
-    }
 
+    if (_wasRecording) _startTimer();
+  }
+
+  void _startTimer() {
+    _timer?.cancel();
     _timer = Timer.periodic(
       const Duration(milliseconds: 250),
       (_) => setState(() {}),
     );
   }
 
+  void _stopTimer() {
+    _timer?.cancel();
+    _timer = null;
+  }
+
   void _onRecordingChange() {
-    assert(widget.onRecordingStopped != null);
-    if (!widget.controller.isRecording) {
-      _timer?.cancel();
-      _timer = null;
+    final isRecording = widget.controller.isRecording;
+    if (isRecording == _wasRecording) return;
+    _wasRecording = isRecording;
+
+    if (isRecording) {
+      _startTimer();
+    } else {
+      _stopTimer();
       widget.onRecordingStopped?.call();
     }
   }
 
   @override
   void dispose() {
-    _timer?.cancel();
+    _stopTimer();
     widget.controller.removeListener(_onRecordingChange);
     super.dispose();
   }
@@ -94,9 +112,8 @@ class _WaveformRecorderState extends State<WaveformRecorder> {
               const SizedBox(width: 8),
               Expanded(
                 child: AnimatedWaveList(
-                  stream: widget.controller.isRecording
-                      ? widget.controller.amplitudeStream
-                      : const Stream<Amplitude>.empty(),
+                  // safe in any controller state: empty until recording starts
+                  stream: widget.controller.amplitudeStream,
                   barBuilder: (animation, amplitude) => WaveFormBar(
                     animation: animation,
                     amplitude: amplitude,

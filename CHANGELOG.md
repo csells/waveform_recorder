@@ -1,3 +1,37 @@
+## 1.8.2
+
+- Fix [#12](https://github.com/csells/waveform_recorder/issues/12) again, this
+  time on the start side: `startRecording()` marked the controller as recording
+  before the amplitude stream existed, so anything that rebuilt during the
+  (potentially long) permission prompt read `amplitudeStream` and got
+  `Exception('Not recording')` thrown out of `build`. The recording session is
+  now published in a single step, so `isRecording` is never true without a live
+  `amplitudeStream`.
+- `amplitudeStream` now returns an empty stream instead of throwing when not
+  recording, making `WaveformRecorder` safe to mount in any controller state.
+- Add `WaveformRecorderController.isStarting` so apps can disable a record
+  button or show a spinner while the recorder spins up.
+- A failed `startRecording()` (e.g. a denied permission) now leaves the
+  controller idle and reusable instead of stuck reporting `Already recording`.
+- `startRecording()` now throws `Exception('Microphone permission denied')`
+  when the user denies microphone access, instead of ignoring the denial and
+  starting a recorder that captures nothing (or, on the web, failing with a
+  bare `NotAllowedError`). Thanks to @dorklein for [the
+  PR](https://github.com/csells/waveform_recorder/pull/14).
+- The example app now shows a `SnackBar` when recording can't start, and its
+  macOS runner declares `NSMicrophoneUsageDescription`; without it, macOS
+  killed the example the first time it asked for the microphone.
+- `onRecordingStopped` now fires only on an actual recording -> stopped
+  transition.
+- Reset the elapsed-time stopwatch on `startRecording()` so a recording that
+  follows `clear()` reports the correct length.
+- Bump the `cross_file` and `path_provider` constraints to the versions they
+  already resolve to.
+- Update the example's platform projects so it builds on Flutter 3.47: the iOS
+  runner drops CocoaPods for Swift Package Manager (as macOS did in 1.8.1) and
+  picks up the UIScene lifecycle; Android moves to Gradle 9.3.1, AGP 9.1.0,
+  Kotlin 2.4.0 and NDK 28.2.
+
 ## 1.8.1
 
 - Fix [#12](https://github.com/csells/waveform_recorder/issues/12):
