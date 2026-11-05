@@ -13,6 +13,14 @@
   button or show a spinner while the recorder spins up.
 - A failed `startRecording()` (e.g. a denied permission) now leaves the
   controller idle and reusable instead of stuck reporting `Already recording`.
+- `startRecording()` now throws `Exception('Microphone permission denied')`
+  when the user denies microphone access, instead of ignoring the denial and
+  starting a recorder that captures nothing (or, on the web, failing with a
+  bare `NotAllowedError`). Thanks to @dorklein for [the
+  PR](https://github.com/csells/waveform_recorder/pull/14).
+- The example app now shows a `SnackBar` when recording can't start, and its
+  macOS runner declares `NSMicrophoneUsageDescription`; without it, macOS
+  killed the example the first time it asked for the microphone.
 - `onRecordingStopped` now fires only on an actual recording -> stopped
   transition.
 - Reset the elapsed-time stopwatch on `startRecording()` so a recording that

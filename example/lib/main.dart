@@ -256,7 +256,18 @@ class _HomePageState extends State<HomePage> {
     if (_waveController.isRecording) {
       await _waveController.stopRecording();
     } else {
-      await _waveController.startRecording();
+      try {
+        await _waveController.startRecording();
+      } on Exception catch (ex) {
+        // e.g. the user denied microphone permission; the controller is left
+        // idle, so the user can fix the problem and tap record again
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(content: Text('Could not start recording: $ex')),
+          );
+        }
+        return;
+      }
       _waveController.amplitudeStream.listen(_amplitudes.add);
     }
   }
