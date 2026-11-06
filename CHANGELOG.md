@@ -1,3 +1,22 @@
+## 2.0.0
+
+- **Breaking:** move to [cross_file](https://pub.dev/packages/cross_file)
+  0.4, whose `XFile` drops `path`, `mimeType` and the synchronous `name`.
+  `WaveformRecorderController.file` is now a `FileSystemXFile` on native
+  platforms (use its `path`) and a `ScopedStorageXFile` wrapping the blob URL on
+  the web (use its `uri`). See "Upgrading to 2.0" in the README.
+- Add `WaveformRecorderController.fileName` and `mimeType`, which carry the
+  name and content type that used to live on the `XFile`.
+- Re-export `XFile`, `FileSystemXFile` and `ScopedStorageXFile`, so apps don't
+  need their own cross_file dependency.
+- **Breaking:** require Dart 3.11 / Flutter 3.41 or later, as cross_file 0.4
+  does.
+- Add on-device integration tests to the example for starting a recording with
+  the microphone permission denied and granted; see
+  `example/integration_test/README.md`.
+- Also includes everything listed for 1.8.2, which was never published on its
+  own.
+
 ## 1.8.2
 
 - Fix [#12](https://github.com/csells/waveform_recorder/issues/12) again, this

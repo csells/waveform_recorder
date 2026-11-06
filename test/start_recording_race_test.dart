@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'dart:io';
 
+import 'package:cross_file_io/cross_file_io.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter/widgets.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -45,18 +46,19 @@ class FakeRecordPlatform extends RecordPlatform {
   Future<Stream<Uint8List>> startStream(
     String recorderId,
     RecordConfig config,
-  ) async =>
-      const Stream<Uint8List>.empty();
+  ) async => const Stream<Uint8List>.empty();
 
   /// How many times the recorder has been stopped.
   int stopCount = 0;
 
-  // An empty path keeps the controller out of its file-handling path, which is
-  // not what these tests are about.
+  /// The path `stop()` reports for the recording. Empty by default, which
+  /// keeps the controller out of its file-handling path.
+  String stopPath = '';
+
   @override
   Future<String?> stop(String recorderId) async {
     stopCount++;
-    return '';
+    return stopPath;
   }
 
   @override
@@ -82,8 +84,7 @@ class FakeRecordPlatform extends RecordPlatform {
   Future<bool> isEncoderSupported(
     String recorderId,
     AudioEncoder encoder,
-  ) async =>
-      true;
+  ) async => true;
 
   @override
   Future<List<InputDevice>> listInputDevices(String recorderId) async => [];
@@ -122,9 +123,9 @@ void main() {
     // recorder never writes to it.
     TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
         .setMockMethodCallHandler(
-      _pathProviderChannel,
-      (call) async => Directory.systemTemp.path,
-    );
+          _pathProviderChannel,
+          (call) async => Directory.systemTemp.path,
+        );
   });
 
   tearDown(() {
@@ -145,7 +146,8 @@ void main() {
     expect(
       controller.isRecording,
       isFalse,
-      reason: 'isRecording must not claim to be recording before the '
+      reason:
+          'isRecording must not claim to be recording before the '
           'amplitude stream exists',
     );
     expect(controller.isStarting, isTrue);
@@ -161,33 +163,35 @@ void main() {
     await settle();
   });
 
-  test('amplitudeStream never throws while startRecording is in flight',
-      () async {
-    final controller = WaveformRecorderController();
+  test(
+    'amplitudeStream never throws while startRecording is in flight',
+    () async {
+      final controller = WaveformRecorderController();
 
-    // Before starting at all.
-    expect(() => controller.amplitudeStream, returnsNormally);
+      // Before starting at all.
+      expect(() => controller.amplitudeStream, returnsNormally);
 
-    platform.permissionGate = Completer<bool>();
-    final starting = controller.startRecording();
+      platform.permissionGate = Completer<bool>();
+      final starting = controller.startRecording();
 
-    // This is the throw reported in issue #12: isRecording said `true`, so
-    // callers read amplitudeStream, and the getter blew up.
-    expect(() => controller.amplitudeStream, returnsNormally);
+      // This is the throw reported in issue #12: isRecording said `true`, so
+      // callers read amplitudeStream, and the getter blew up.
+      expect(() => controller.amplitudeStream, returnsNormally);
 
-    platform.permissionGate!.complete(true);
-    await starting;
+      platform.permissionGate!.complete(true);
+      await starting;
 
-    expect(() => controller.amplitudeStream, returnsNormally);
+      expect(() => controller.amplitudeStream, returnsNormally);
 
-    await controller.stopRecording();
+      await controller.stopRecording();
 
-    // And after stopping.
-    expect(() => controller.amplitudeStream, returnsNormally);
+      // And after stopping.
+      expect(() => controller.amplitudeStream, returnsNormally);
 
-    controller.dispose();
-    await settle();
-  });
+      controller.dispose();
+      await settle();
+    },
+  );
 
   test('a failed startRecording leaves the controller reusable', () async {
     final controller = WaveformRecorderController();
@@ -216,30 +220,32 @@ void main() {
     await settle();
   });
 
-  test('a denied permission fails the start without starting the recorder',
-      () async {
-    final controller = WaveformRecorderController();
-    var notifications = 0;
-    controller.addListener(() => notifications++);
+  test(
+    'a denied permission fails the start without starting the recorder',
+    () async {
+      final controller = WaveformRecorderController();
+      var notifications = 0;
+      controller.addListener(() => notifications++);
 
-    platform.permissionGate = Completer<bool>();
-    final starting = controller.startRecording();
-    await settle();
-    platform.permissionGate!.complete(false);
+      platform.permissionGate = Completer<bool>();
+      final starting = controller.startRecording();
+      await settle();
+      platform.permissionGate!.complete(false);
 
-    await expectLater(starting, throwsException);
+      await expectLater(starting, throwsException);
 
-    expect(platform.startCount, 0);
-    expect(controller.isRecording, isFalse);
-    expect(controller.isStarting, isFalse);
-    expect(controller.startTime, isNull);
-    // Listeners hear about the failed start, so a UI showing isStarting
-    // goes back to idle.
-    expect(notifications, 2);
+      expect(platform.startCount, 0);
+      expect(controller.isRecording, isFalse);
+      expect(controller.isStarting, isFalse);
+      expect(controller.startTime, isNull);
+      // Listeners hear about the failed start, so a UI showing isStarting
+      // goes back to idle.
+      expect(notifications, 2);
 
-    controller.dispose();
-    await settle();
-  });
+      controller.dispose();
+      await settle();
+    },
+  );
 
   test('overlapping startRecording calls are still rejected', () async {
     final controller = WaveformRecorderController();
@@ -281,43 +287,46 @@ void main() {
   });
 
   testWidgets(
-      'WaveformRecorder mounts safely while startRecording is in flight',
-      (tester) async {
-    final controller = WaveformRecorderController();
+    'WaveformRecorder mounts safely while startRecording is in flight',
+    (tester) async {
+      final controller = WaveformRecorderController();
 
-    platform.permissionGate = Completer<bool>();
-    final starting = controller.startRecording();
+      platform.permissionGate = Completer<bool>();
+      final starting = controller.startRecording();
 
-    // The example app mounts WaveformRecorder from a parent rebuild; doing so
-    // during the start window used to throw Exception('Not recording') out of
-    // build().
-    await tester.pumpWidget(
-      Directionality(
-        textDirection: TextDirection.ltr,
-        child: WaveformRecorder(height: 48, controller: controller),
-      ),
-    );
+      // The example app mounts WaveformRecorder from a parent rebuild; doing so
+      // during the start window used to throw Exception('Not recording') out of
+      // build().
+      await tester.pumpWidget(
+        Directionality(
+          textDirection: TextDirection.ltr,
+          child: WaveformRecorder(height: 48, controller: controller),
+        ),
+      );
 
-    expect(tester.takeException(), isNull);
+      expect(tester.takeException(), isNull);
 
-    // The widget's 250ms rebuild timer keeps hitting build() during the window.
-    await tester.pump(const Duration(milliseconds: 300));
-    expect(tester.takeException(), isNull);
+      // The widget's 250ms rebuild timer keeps hitting build() during the
+      // window.
+      await tester.pump(const Duration(milliseconds: 300));
+      expect(tester.takeException(), isNull);
 
-    platform.permissionGate!.complete(true);
-    await tester.pump();
-    await starting;
-    await tester.pump();
-    expect(tester.takeException(), isNull);
+      platform.permissionGate!.complete(true);
+      await tester.pump();
+      await starting;
+      await tester.pump();
+      expect(tester.takeException(), isNull);
 
-    await controller.stopRecording();
-    await tester.pumpWidget(const SizedBox.shrink());
-    controller.dispose();
-    await tester.pump();
-  });
+      await controller.stopRecording();
+      await tester.pumpWidget(const SizedBox.shrink());
+      controller.dispose();
+      await tester.pump();
+    },
+  );
 
-  testWidgets('onRecordingStopped fires once, on the stop transition',
-      (tester) async {
+  testWidgets('onRecordingStopped fires once, on the stop transition', (
+    tester,
+  ) async {
     final controller = WaveformRecorderController();
     var stoppedCount = 0;
 
@@ -347,5 +356,39 @@ void main() {
     await tester.pumpWidget(const SizedBox.shrink());
     controller.dispose();
     await tester.pump();
+  });
+
+  test('a stopped recording is exposed as a file-system XFile', () async {
+    final dir = await Directory.systemTemp.createTemp('waveform_recorder_');
+    addTearDown(() => dir.delete(recursive: true));
+    final recording = File('${dir.path}/audio-1.m4a');
+    await recording.writeAsBytes([1, 2, 3]);
+    platform.stopPath = recording.path;
+
+    // plugin implementations aren't registered under `flutter test`
+    CrossFileIO.registerWith();
+
+    final controller = WaveformRecorderController();
+    expect(controller.file, isNull);
+    expect(controller.fileName, isNull);
+    expect(controller.mimeType, isNull);
+
+    await controller.startRecording();
+    await controller.stopRecording();
+
+    final file = controller.file;
+    expect(file, isA<FileSystemXFile>());
+    expect((file! as FileSystemXFile).path, recording.path);
+    expect(await file.length(), 3);
+    expect(controller.fileName, 'audio-1.m4a');
+    expect(controller.mimeType, 'audio/mp4');
+
+    controller.clear();
+    expect(controller.file, isNull);
+    expect(controller.fileName, isNull);
+    expect(controller.mimeType, isNull);
+
+    controller.dispose();
+    await settle();
   });
 }

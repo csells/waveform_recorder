@@ -16,8 +16,9 @@ class WaveformRecorder extends StatefulWidget {
     this.onRecordingStarted,
     this.onRecordingStopped,
     this.waveColor = const Color(0xFF000000), // Default to black
-    this.durationTextStyle =
-        const TextStyle(color: Color(0xFF000000)), // Default to black
+    this.durationTextStyle = const TextStyle(
+      color: Color(0xFF000000),
+    ), // Default to black
     super.key,
   });
 
@@ -97,34 +98,31 @@ class _WaveformRecorderState extends State<WaveformRecorder> {
 
   @override
   Widget build(BuildContext context) => SizedBox(
-        height: widget.height,
-        child: Padding(
-          padding: const EdgeInsets.all(8),
-          child: Row(
-            children: [
-              Align(
-                alignment: Alignment.centerLeft,
-                child: Text(
-                  _elapsedTime,
-                  style: widget.durationTextStyle,
-                ),
-              ),
-              const SizedBox(width: 8),
-              Expanded(
-                child: AnimatedWaveList(
-                  // safe in any controller state: empty until recording starts
-                  stream: widget.controller.amplitudeStream,
-                  barBuilder: (animation, amplitude) => WaveFormBar(
-                    animation: animation,
-                    amplitude: amplitude,
-                    color: widget.waveColor,
-                  ),
-                ),
-              ),
-            ],
+    height: widget.height,
+    child: Padding(
+      padding: const EdgeInsets.all(8),
+      child: Row(
+        children: [
+          Align(
+            alignment: Alignment.centerLeft,
+            child: Text(_elapsedTime, style: widget.durationTextStyle),
           ),
-        ),
-      );
+          const SizedBox(width: 8),
+          Expanded(
+            child: AnimatedWaveList(
+              // safe in any controller state: empty until recording starts
+              stream: widget.controller.amplitudeStream,
+              barBuilder: (animation, amplitude) => WaveFormBar(
+                animation: animation,
+                amplitude: amplitude,
+                color: widget.waveColor,
+              ),
+            ),
+          ),
+        ],
+      ),
+    ),
+  );
 
   String get _elapsedTime {
     final elapsed = widget.controller.timeElapsed;

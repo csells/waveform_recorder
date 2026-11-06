@@ -3,11 +3,10 @@ description: "An example of the waveform_recorder package in action."
 publish_to: 'none'
 
 environment:
-  sdk: ^3.0.0
+  sdk: ^3.11.0
 
 dependencies:
   audioplayers: ^6.8.1
-  cross_file: ^0.3.5+4
   cupertino_icons: ^1.0.9
   flutter:
     sdk: flutter
@@ -22,6 +21,8 @@ dependencies:
 dev_dependencies:
   all_lint_rules_community: ^0.0.43
   flutter_test:
+    sdk: flutter
+  integration_test:
     sdk: flutter
 
 flutter:

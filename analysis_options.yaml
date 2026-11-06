@@ -11,6 +11,9 @@ analyzer:
     # without ignore here, we cause import of all_lint_rules to warn, because
     # some rules conflict; instead, we're explicitly enabling even conflicting
     # rules and are fixing the conflicts in this file
+    # deprecated, so it can't be turned off under linter/rules without a
+    # deprecated_lint warning; all.yaml still enables it, so silence it here
+    prefer_final_parameters: ignore
     cascade_invocations: ignore
     included_file_warning: ignore
     specify_nonobvious_local_variable_types: ignore
@@ -20,7 +23,6 @@ linter:
     prefer_double_quotes: false # Dart prefers single quotes (for some reason)
     unnecessary_final: false # love final!
     always_specify_types: false # no; prefer use of final instead
-    prefer_final_parameters: false # I like the sentiment, but too much typing!
     prefer_asserts_with_message: false # too lazy for this...
     require_trailing_commas: false # not good for things all on one line
     public_member_api_docs: true # except for public libs

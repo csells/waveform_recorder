@@ -123,19 +123,21 @@ class _MyAppState extends State<MyApp> {
     if (file == null) return;
 
     _textController.text = ''
-        '${file.name}: '
+        '${_waveController.fileName}: '
         '${_waveController.length.inMilliseconds / 1000} seconds';
 
-    debugPrint('XFile properties:');
-    debugPrint('  path: ${file.path}');
-    debugPrint('  name: ${file.name}');
-    debugPrint('  mimeType: ${file.mimeType}');
+    debugPrint('Recording properties:');
+    debugPrint('  uri: ${file.uri}');
+    debugPrint('  fileName: ${_waveController.fileName}');
+    debugPrint('  mimeType: ${_waveController.mimeType}');
   }
 
   Future<void> _playRecording() async {
     final file = _waveController.file;
     if (file == null) return;
-    final source = kIsWeb ? UrlSource(file.path) : DeviceFileSource(file.path);
+    final source = file is FileSystemXFile
+        ? DeviceFileSource(file.path)
+        : UrlSource(file.uri);
     await AudioPlayer().play(source);
   }
 }
@@ -143,21 +145,35 @@ class _MyAppState extends State<MyApp> {
 
 ### Usage Considerations
 
-For all platforms except the web, the output of a record operation is a file on
-your hard drive; it's your app's responsibility to remove this temp file when
-it's done with it. When executing on the web, the file (an instance of the XFile
-type from [the cross_file package](https://pub.dev/packages/cross_file)) of the
-recorded audio will contain a path to a blob URL but otherwise, it will be a
-file in the file system. You can get the path to that file from
-`WaveformRecorderController.file.path`, e.g.
+`WaveformRecorderController.file` is an `XFile` from [the cross_file
+package](https://pub.dev/packages/cross_file); waveform_recorder re-exports
+`XFile`, `FileSystemXFile` and `ScopedStorageXFile` so you don't need to depend on
+cross_file yourself.
+
+On every platform except the web, the recording is a temporary file on disk and
+`file` is a `FileSystemXFile`; it's your app's responsibility to remove this
+temp file when it's done with it. On the web, the recording is a blob URL and
+`file` is a `ScopedStorageXFile` whose `uri` is that URL. Use the controller's
+`fileName` and `mimeType` for a display/download name and content type, e.g.
 
 ```dart
   Future<void> _deleteRecording() async {
     final file = _waveController.file;
-    if (file == null) return;
-    if (!kIsWeb) await File(file.path).delete();
+    if (file is FileSystemXFile) await File(file.path).delete();
   }
 ```
+
+### Upgrading to 2.0
+
+Version 2.0 moves to cross_file 0.4, whose `XFile` no longer has `path`,
+`mimeType` or a synchronous `name`:
+
+- `file.path` → `(file as FileSystemXFile).path` on native platforms, or
+  `file.uri` (the blob URL) on the web
+- `file.name` → `controller.fileName`
+- `file.mimeType` → `controller.mimeType`
+
+It also requires Dart 3.11 / Flutter 3.41 or later.
 
 ## Feedback
 

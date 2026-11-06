@@ -12,10 +12,7 @@ void main() {
     await tester.pumpWidget(
       Directionality(
         textDirection: TextDirection.ltr,
-        child: WaveformRecorder(
-          height: 48,
-          controller: controller,
-        ),
+        child: WaveformRecorder(height: 48, controller: controller),
       ),
     );
 

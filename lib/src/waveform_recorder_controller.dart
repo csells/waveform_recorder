@@ -1,7 +1,5 @@
 import 'dart:async';
 
-// import 'dart:io';
-
 import 'package:cross_file/cross_file.dart';
 import 'package:flutter/foundation.dart';
 import 'package:path/path.dart' as ph; // path helper
@@ -24,21 +22,22 @@ class WaveformRecorderController extends ChangeNotifier {
     @Deprecated('Use config instead') AudioEncoder? encoder,
     RecordConfig? config,
   }) : config = RecordConfig(
-          encoder: encoder ??
-              config?.encoder ??
-              (kIsWeb ? AudioEncoder.wav : AudioEncoder.aacLc),
-          numChannels: config?.numChannels ?? 1,
-          bitRate: config?.bitRate ?? 128000,
-          sampleRate: config?.sampleRate ?? 44100,
-          device: config?.device,
-          autoGain: config?.autoGain ?? false,
-          echoCancel: config?.echoCancel ?? false,
-          noiseSuppress: config?.noiseSuppress ?? false,
-          androidConfig: config?.androidConfig ?? const AndroidRecordConfig(),
-          audioInterruption:
-              config?.audioInterruption ?? AudioInterruptionMode.pause,
-          iosConfig: config?.iosConfig ?? const IosRecordConfig(),
-        );
+         encoder:
+             encoder ??
+             config?.encoder ??
+             (kIsWeb ? AudioEncoder.wav : AudioEncoder.aacLc),
+         numChannels: config?.numChannels ?? 1,
+         bitRate: config?.bitRate ?? 128000,
+         sampleRate: config?.sampleRate ?? 44100,
+         device: config?.device,
+         autoGain: config?.autoGain ?? false,
+         echoCancel: config?.echoCancel ?? false,
+         noiseSuppress: config?.noiseSuppress ?? false,
+         androidConfig: config?.androidConfig ?? const AndroidRecordConfig(),
+         audioInterruption:
+             config?.audioInterruption ?? AudioInterruptionMode.pause,
+         iosConfig: config?.iosConfig ?? const IosRecordConfig(),
+       );
 
   /// The interval at which amplitude data is emitted during recording.
   ///
@@ -54,6 +53,7 @@ class WaveformRecorderController extends ChangeNotifier {
   Stream<waveform.Amplitude>? _amplitudeStream;
   AudioRecorder? _audioRecorder;
   XFile? _file;
+  String? _fileName;
   var _length = Duration.zero;
   var _starting = false;
   var _disposed = false;
@@ -98,7 +98,22 @@ class WaveformRecorderController extends ChangeNotifier {
   /// This property returns the [XFile] containing the recorded audio data. It
   /// will be null if no recording has been made or if the recording process
   /// hasn't completed.
+  ///
+  /// On native platforms this is a [FileSystemXFile] whose `path` is the
+  /// temporary recording file; on the web it is a [ScopedStorageXFile] whose
+  /// `uri` is the browser's blob URL for the recording.
   XFile? get file => _file;
+
+  /// The file name for the recording in [file], e.g. `audio.wav`.
+  ///
+  /// On native platforms this is the name of the temporary file. On the web,
+  /// where the recording is a blob URL with no name of its own, it is `audio`
+  /// plus the extension for [config]'s encoder. Null when [file] is null.
+  String? get fileName => _fileName;
+
+  /// The MIME type of the recording in [file], based on [config]'s encoder,
+  /// e.g. `audio/wav`. Null when [file] is null.
+  String? get mimeType => _file == null ? null : _mimeTypeFor(config.encoder);
 
   /// The duration of the recorded audio.
   Duration get length => _length;
@@ -113,6 +128,7 @@ class WaveformRecorderController extends ChangeNotifier {
     unawaited(_audioRecorder?.dispose());
     _audioRecorder = null;
     _file = null;
+    _fileName = null;
     _length = Duration.zero;
     _startTime = null;
     _stopwatch
@@ -141,6 +157,7 @@ class WaveformRecorderController extends ChangeNotifier {
 
     _starting = true;
     _file = null;
+    _fileName = null;
     _length = Duration.zero;
 
     // Announce the pending start on a microtask so that callers may start
@@ -189,9 +206,7 @@ class WaveformRecorderController extends ChangeNotifier {
     // map the amplitude types as they stream in
     _amplitudeStream = recorder
         .onAmplitudeChanged(interval)
-        .map(
-          (a) => waveform.Amplitude(current: a.current, max: a.max),
-        )
+        .map((a) => waveform.Amplitude(current: a.current, max: a.max))
         .asBroadcastStream(); // allows multiple listeners
 
     _stopwatch
@@ -215,7 +230,12 @@ class WaveformRecorderController extends ChangeNotifier {
       final path = await recorder.stop() ?? '';
       if (path.isNotEmpty) {
         await PlatformHelper.waitForTempAudioFile(path);
-        _file = _fileFor(config.encoder, path);
+        _file = kIsWeb
+            ? XFile.scopedStorage(uri: path)
+            : XFile.fileSystem(path: path);
+        _fileName = kIsWeb
+            ? 'audio.${_extFor(config.encoder)}'
+            : ph.basename(path);
         _length = _stopwatch.elapsed;
       }
     } finally {
@@ -303,36 +323,25 @@ class WaveformRecorderController extends ChangeNotifier {
     }
   }
 
-  XFile _fileFor(AudioEncoder encoder, String path) {
-    final ext = _extFor(encoder);
-    final mimetype = _mimeTypeFor(encoder);
-    final name = kIsWeb ? 'audio.$ext' : ph.basename(path);
-    return XFile(path, name: name, mimeType: mimetype);
-  }
-
   String _extFor(AudioEncoder encoder) => switch (encoder) {
-        AudioEncoder.aacLc ||
-        AudioEncoder.aacEld ||
-        AudioEncoder.aacHe =>
-          'm4a',
-        AudioEncoder.amrNb || AudioEncoder.amrWb => '3gp',
-        AudioEncoder.opus => 'opus',
-        AudioEncoder.flac => 'flac',
-        AudioEncoder.wav => 'wav',
-        AudioEncoder.pcm16bits => 'pcm',
-      };
+    AudioEncoder.aacLc || AudioEncoder.aacEld || AudioEncoder.aacHe => 'm4a',
+    AudioEncoder.amrNb || AudioEncoder.amrWb => '3gp',
+    AudioEncoder.opus => 'opus',
+    AudioEncoder.flac => 'flac',
+    AudioEncoder.wav => 'wav',
+    AudioEncoder.pcm16bits => 'pcm',
+  };
 
   String _mimeTypeFor(AudioEncoder encoder) => switch (encoder) {
-        AudioEncoder.aacLc ||
-        AudioEncoder.aacEld ||
-        AudioEncoder.aacHe ||
-        AudioEncoder.opus =>
-          'audio/mp4',
-        AudioEncoder.amrNb || AudioEncoder.amrWb => 'audio/3gpp',
-        AudioEncoder.flac => 'audio/flac',
-        AudioEncoder.wav => 'audio/wav',
-        AudioEncoder.pcm16bits => 'audio/pcm',
-      };
+    AudioEncoder.aacLc ||
+    AudioEncoder.aacEld ||
+    AudioEncoder.aacHe ||
+    AudioEncoder.opus => 'audio/mp4',
+    AudioEncoder.amrNb || AudioEncoder.amrWb => 'audio/3gpp',
+    AudioEncoder.flac => 'audio/flac',
+    AudioEncoder.wav => 'audio/wav',
+    AudioEncoder.pcm16bits => 'audio/pcm',
+  };
 
   /// Clears the current recording state.
   ///
@@ -342,6 +351,7 @@ class WaveformRecorderController extends ChangeNotifier {
     _stopwatch.stop();
     unawaited(_audioRecorder?.dispose());
     _file = null;
+    _fileName = null;
     _length = Duration.zero;
     _startTime = null;
     _amplitudeStream = null;

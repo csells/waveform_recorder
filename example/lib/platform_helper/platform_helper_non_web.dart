@@ -1,21 +1,21 @@
 import 'dart:io';
 
 import 'package:audioplayers/audioplayers.dart';
-import 'package:cross_file/cross_file.dart';
 import 'package:path/path.dart' as p;
 import 'package:path_provider/path_provider.dart';
+import 'package:waveform_recorder/waveform_recorder.dart';
 
 class PlatformHelper {
-  static Source audioSource(XFile file) => DeviceFileSource(
-        file.path,
-        mimeType: file.mimeType,
-      );
+  // on native platforms the recording is a file on disk
+  static String _path(XFile file) => (file as FileSystemXFile).path;
 
-  static Future<void> deleteFile(XFile file) => File(file.path).delete();
+  static Source audioSource(XFile file, {String? mimeType}) =>
+      DeviceFileSource(_path(file), mimeType: mimeType);
 
-  static Future<void> downloadFile(XFile file) async {
+  static Future<void> deleteFile(XFile file) => File(_path(file)).delete();
+
+  static Future<void> downloadFile(XFile file, String name) async {
     final dir = (await getDownloadsDirectory())!;
-    final path = p.join(dir.path, file.name);
-    await File(path).writeAsBytes(await file.readAsBytes());
+    await File(_path(file)).copy(p.join(dir.path, name));
   }
 }
